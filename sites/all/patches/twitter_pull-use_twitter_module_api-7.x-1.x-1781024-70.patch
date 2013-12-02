@@ -1,0 +1,311 @@
+diff --git a/twitter-pull-listing.css b/twitter-pull-listing.css
+index 15c89c2..a5e073b 100644
+--- a/twitter-pull-listing.css
++++ b/twitter-pull-listing.css
+@@ -20,4 +20,26 @@ div.tweets-pulled-listing  div.tweet-divider {
+   clear: left;
+   border-bottom: 1px solid #efefef;
+   margin: 5px 0 5px 0;
++}
++
++div.tweet-author-wrapper .twitter-follow-button {
++	float:right;
++}
++
++div.tweet-author-wrapper .tweet-author-info {
++	float:left;
++	width:75%;
++	min-width: 175px;
++}
++
++div.tweet-footer {
++	font-size: 0.75em;
++}
++
++div.tweet-footer .tweet-time {
++	float:left;
++}
++
++div.tweet-footer .tweet-actions {
++	float:right;
+ }
+\ No newline at end of file
+diff --git a/twitter-pull-listing.tpl.php b/twitter-pull-listing.tpl.php
+index 8312f81..fa90638 100644
+--- a/twitter-pull-listing.tpl.php
++++ b/twitter-pull-listing.tpl.php
+@@ -36,11 +36,30 @@
+     <ul class="tweets-pulled-listing">
+     <?php foreach ($tweets as $tweet_key => $tweet): ?>
+       <li>
+-        <div class="tweet-authorphoto"><img src="<?php print $tweet->userphoto; ?>" alt="<?php print $tweet->username; ?>" /></div>
+-        <span class="tweet-author"><?php print l($tweet->username, 'http://twitter.com/' . $tweet->username); ?></span>
+-        <span class="tweet-text"><?php print twitter_pull_add_links($tweet->text); ?></span>
+-        <div class="tweet-time"><?php print l($tweet->time_ago, 'http://twitter.com/' . $tweet->username . '/status/' . $tweet->id);?></div>
+-
++        <div class="tweet-author-wrapper clearfix">
++          <div class="tweet-author-info clearfix">
++            <div class="tweet-authorphoto">
++              <?php print l("<img src=\"$tweet->userphoto\" alt=\"$tweet->username\" />", 'https://twitter.com/' . $tweet->screenname, array('html' => TRUE)); ?>
++            </div>
++            <div class="tweet-author"><?php print l($tweet->username, 'https://twitter.com/' . $tweet->screenname); ?></div>
++            <div class="tweet-screenname"><?php print l('@' . $tweet->screenname, 'https://twitter.com/' . $tweet->screenname); ?></div>
++          </div>
++          <?php print l(t("Follow @$tweet->screenname"), 'https://twitter.com/' . $tweet->screenname, array('attributes'=> array(
++              'class' => array('twitter-follow-button'),
++              'data-show-count' => 'false',
++              'data-lang' => $language,
++              'data-width' => '75px',
++            )));?>
++        </div>
++        <div class="tweet-text"><?php print twitter_pull_add_links($tweet->text); ?></div>
++        <div class="tweet-footer">
++          <div class="tweet-time"><?php print l($tweet->time_ago, 'http://twitter.com/' . $tweet->screenname . '/status/' . $tweet->id);?></div>
++          <div class="tweet-actions">
++            <?php print l('Reply', "https://twitter.com/intent/tweet?in_reply_to=$tweet->id", array('attributes' => array('class' => 'twitter-reply'))); ?>
++            <?php print l('Retweet', "https://twitter.com/intent/retweet?tweet_id=$tweet->id", array('attributes' => array('class' => 'twitter-retweet'))); ?>
++            <?php print l('Favorite', "https://twitter.com/intent/favorite?tweet_id=$tweet->id", array('attributes' => array('class' => 'twitter-favorite'))); ?>
++          </div>
++        </div>
+         <?php if ($tweet_key < $tweet_count - 1): ?>
+           <div class="tweet-divider"></div>
+         <?php endif; ?>
+diff --git a/twitter_pull.class.inc b/twitter_pull.class.inc
+index 623fdc3..e82a1cc 100644
+--- a/twitter_pull.class.inc
++++ b/twitter_pull.class.inc
+@@ -41,6 +41,15 @@ class twitter_puller {
+ 
+   function get_items() {
+ 
++    /* First try to use the twitter module to get the tweets
++     * At some point, authentication will be required and if you have the
++     * twitter module set up properly, it will handle the authenticated session.
++     */
++    if ($this->twitter_get_items()) {
++      return;
++    }
++
++    watchdog('Twitter Pull', 'Twitter Pull is using an Unauthenticated request to twitter apis.  Download, enable and configure the twitter module to allow for authenticated requests.');
+     $prefix = drupal_substr($this->twitkey, 0, 1);
+     $slash = strpos($this->twitkey, '/', 1);
+     $num = intval($this->num_items);
+@@ -93,6 +102,85 @@ class twitter_puller {
+ 
+   }
+ 
++  /**
++   * Use the twitter module to get the results.
++   *
++   *  - The twitter module will use an authenticated session to get the tweets
++   *  - via the twiter 1.1 API.
++   */
++  function twitter_get_items() {
++    // Check for the twitter module.
++    if (!module_exists('twitter')) {
++      return FALSE;
++    }
++    // Load the twitter module.
++    module_load_include('inc', 'twitter');
++
++    // Get twitkey statistics.
++    $prefix = drupal_substr($this->twitkey, 0, 1);
++    $slash = strpos($this->twitkey, '/', 1);
++    $num = intval($this->num_items);
++    $key = drupal_substr($this->twitkey, 1);
++
++    // Start building the parameters for the twitter api.
++    $params = array(
++      'count' => $num,
++    );
++
++    // Determin the type of request.
++    // Set up the path and params according to the type of request.
++    switch ($prefix) {
++      case "@":
++        if ($slash === FALSE) {
++          // Just a normal user timeline.
++          $path                         = "statuses/user_timeline";
++          $params['screen_name']        = $key;
++        }
++        else {
++          // Since we have at least one slash, we are going to get a list.
++          $path                         = "lists/statuses";
++          $params['owner_screen_name']  = drupal_substr($this->twitkey, 1, $slash - 1);
++          $params['slug']               = drupal_substr($this->twitkey, $slash + 1);
++        }
++        break;
++
++      case "~":
++        // Looking for favorites.
++        $path                         = "favorites/list";
++        $params['screen_name']        = $key;
++        break;
++
++      default:
++        // Default to a not=rmal search.
++        $path             = "search/tweets";
++        $params['count']  = $num > 100 ? 100 : $num;
++        $params['q']      = $this->twitkey;
++        break;
++    }
++
++    $twitter = twitter_connect();
++    if (!$twitter) {
++      watchdog('Twitter Pull', 'Twitter module is not properly configured and could not be used.');
++      return FALSE;
++    }
++
++    // Try to load the status via the twitter api (from the twitter module).
++    $result = $twitter->call($path, $params, "GET");
++
++    // Create/Empty the tweets array.
++    $this->tweets = array();
++
++    // Search results return metadata and the rusults in a sub-array
++    // We need to parse the actual result array.
++    $result = isset($result['statuses']) ? $result['statuses'] : $result;
++
++    // Proccess the tweets for twitter_pull compatibility.
++    $this->parse_items($result);
++
++    // Return if we got any results.
++    return (count($this->tweets) > 0);
++  }
++
+   function parse_items($items) {
+     $tweets = array();
+ 
+@@ -106,34 +194,23 @@ class twitter_puller {
+       foreach ($items as $item) {
+         $obj = new stdClass();
+ 
+-        if (isset($item->retweeted_status)) {
+-          $obj->id = check_plain($item->retweeted_status->id_str);
+-          $obj->username = (isset($item->retweeted_status->user) && !empty($item->retweeted_status->user->screen_name)) ? $item->retweeted_status->user->screen_name : $item->retweeted_status->from_user;
+-          $obj->username = check_plain($obj->username);
+-          //get the user photo for the retweet
+-          $obj->userphoto = (isset($item->retweeted_status->user) && !empty($item->retweeted_status->user->profile_image_url)) ? $item->retweeted_status->user->profile_image_url : $item->retweeted_status->profile_image_url;
+-          $obj->userphoto = check_plain($obj->userphoto);
+-          $obj->userphoto_https = (isset($item->retweeted_status->user) && !empty($item->retweeted_status->user->profile_image_url_https)) ? $item->retweeted_status->user->profile_image_url_https : $item->retweeted_status->profile_image_url_https;
+-          $obj->userphoto_https = check_plain($obj->userphoto_https);
+-
+-          $obj->text = filter_xss($item->retweeted_status->text);
+-          //-- Convert date to unix timestamp so themer can easily work with it.
+-          $obj->timestamp = strtotime($item->retweeted_status->created_at);
+-        }
+-        else {
+-          $obj->id = check_plain($item->id_str);
+-          $obj->username = (isset($item->user) && !empty($item->user->screen_name)) ? $item->user->screen_name : $item->from_user;
+-          $obj->username = check_plain($obj->username);
+-          //retrieve the user photo
+-          $obj->userphoto = (isset($item->user) && !empty($item->user->profile_image_url)) ? $item->user->profile_image_url : $item->profile_image_url;
+-          $obj->userphoto = check_plain($obj->userphoto);
+-          $obj->userphoto_https = (isset($item->user) && !empty($item->user->profile_image_url_https)) ? $item->user->profile_image_url_https : $item->profile_image_url_https;
+-          $obj->userphoto_https = check_plain($obj->userphoto_https);
+-
+-          $obj->text = filter_xss($item->text);
+-          //-- Convert date to unix timestamp so themer can easily work with it.
+-          $obj->timestamp = strtotime($item->created_at);
+-        }
++        $item = (object) $item;
++
++        $user = !empty($item->retweeted_status) ? $item->retweeted_status->user : $item->user;
++
++        $obj->id = check_plain($item->id_str);
++        $obj->username = check_plain(!empty($user->name) ? $user->name : $item->from_user);
++
++        $obj->screenname = check_plain(!empty($user->screen_name) ? $user->screen_name : $item->from_user);
++
++        //retrieve the user photo
++        $obj->userphoto = check_plain(!empty($user->profile_image_url) ? $user->profile_image_url : $item->profile_image_url);
++        $obj->userphoto_https = check_plain(!empty($user->profile_image_url_https) ? $user->profile_image_url_https : $item->profile_image_url_https);
++
++        $obj->text = filter_xss($item->text);
++        //-- Convert date to unix timestamp so themer can easily work with it.
++        $obj->timestamp = strtotime($item->created_at);
++
+         $tweets[] = $obj;
+       }
+     }
+diff --git a/twitter_pull.module b/twitter_pull.module
+index e6889fc..48afebf 100644
+--- a/twitter_pull.module
++++ b/twitter_pull.module
+@@ -50,9 +50,10 @@ function twitter_pull_flush_caches() {
+  * Defines default theme template for a list of tweets.
+  */
+ function twitter_pull_theme() {
++  global $language;
+   return array(
+     'twitter_pull_listing' => array(
+-      'variables' => array('tweets' => NULL, 'twitkey' => NULL, 'title' => NULL, 'lazy_load' => NULL),
++      'variables' => array('tweets' => NULL, 'twitkey' => NULL, 'title' => NULL, 'lazy_load' => NULL, 'language' => $language->language),
+       'template' => 'twitter-pull-listing',
+     ),
+   );
+@@ -66,6 +67,10 @@ function twitter_pull_preprocess(&$variables, $hook) {
+         $tweet->time_ago = t('!time ago.', array('!time' => format_interval(time() - $tweet->timestamp)));
+         $variables['tweets'][$key] = $tweet;
+       }
++      //Add Follow Button javascript
++      drupal_add_js('!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0];if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src="//platform.twitter.com/widgets.js";fjs.parentNode.insertBefore(js,fjs);}}(document,"script","twitter-wjs");', 'inline');
++      // Web Intents javascript
++      drupal_add_js('//platform.twitter.com/widgets.js', 'external');
+     }
+     break;
+   }
+@@ -327,3 +332,53 @@ function twitter_pull_admin_menu_cache_info() {
+ function _twitter_pull_cache_clear() {
+   cache_clear_all('*', TWITTER_PULL_CACHE_TABLE, TRUE);
+ }
++
++
++/**
++ * Implements hook_requirements().
++ *
++ * Report on whether we're using the authenticated api or not.
++ */
++function twitter_pull_requirements($phase) {
++  if ($phase == 'runtime') {
++     // Check for the twitter module.
++    if (!module_exists('twitter')) {
++      return array(
++        'twittter_pull_auth' => array(
++          'title' => t('Twitter Pull Authentication'),
++          'description' => t('Twitter Pull requires the !module to use the new Twitter API.  The twitter API you are currently using will cease to function in the near future.  See !link.',
++                              array(
++                                '!link' => l('new twitter api information', 'https://dev.twitter.com/blog/changes-coming-to-twitter-api'),
++                                '!module' => l('Twitter module', 'http://drupal.org/project/twitter'),
++                              )
++                          ),
++          'value' => t('Using Unauthenticated API'),
++          'severity' => REQUIREMENT_WARNING,
++        ),
++      );
++    }
++    // Load the twitter module.
++    module_load_include('inc', 'twitter');
++
++    $twitter = twitter_connect();
++    if (!$twitter) {
++      return array(
++        'twittter_pull_auth' => array(
++          'title' => t('Twitter Pull Authentication'),
++          'description' => t('The twitter module does not have any authorized accounts.  You must authorize at least one account in order for twitter pull to be able to authenticate with Twitter.  Go to !link to add an account.', array('!link' => l('the Twitter module accounts page', 'admin/config/services/twitter'))),
++          'value' => t('Using Unauthenticated API'),
++          'severity' => REQUIREMENT_WARNING,
++        ),
++      );
++    }
++
++    return array(
++      'twittter_pull_auth' => array(
++        'title' => t('Twitter Pull Authentication'),
++        'description' => t('Twitter pull is using the Twitter module to authenticate requests with Twitter.'),
++        'value' => t('Using Twitter Module Authentication'),
++        'severity' => REQUIREMENT_OK,
++      ),
++    );
++  }
++}

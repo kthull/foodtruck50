@@ -1,0 +1,32 @@
+/* @license
+ * MyFonts Webfont Build ID 2345716, 2012-08-17T13:28:33-0400
+ * 
+ * The fonts listed in this notice are subject to the End User License
+ * Agreement(s) entered into by the website owner. All other parties are 
+ * explicitly restricted from using the Licensed Webfonts(s).
+ * 
+ * You may obtain a valid license at the URLs below.
+ * 
+ * Webfont: Veneer by Yellow Design Studio
+ * URL: http://www.myfonts.com/fonts/yellow-design/veneer/regular/
+ * Licensed pageviews: 20,000
+ * 
+ * Webfont: Veneer Extras by Yellow Design Studio
+ * URL: http://www.myfonts.com/fonts/yellow-design/veneer/extras/
+ * Licensed pageviews: unspecified
+ * 
+ * 
+ * License: http://www.myfonts.com/viewlicense?type=web&buildid=2345716
+ * Webfonts copyright: Copyright (c) 2012 by Yellow Design Studio. All rights reserved.
+ * 
+ * © 2012 Bitstream Inc
+*/
+
+
+
+  
+ @font-face {font-family: 'Veneer';src: url('/sites/all/themes/bartik50/fonts/23CAF4_0_0.eot');src: url('/sites/all/themes/bartik50/fonts/23CAF4_0_0.eot?#iefix') format('embedded-opentype'),url('/sites/all/themes/bartik50/fonts/23CAF4_0_0.woff') format('woff'),url('/sites/all/themes/bartik50/fonts/23CAF4_0_0.ttf') format('truetype');}
+ 
+  
+ @font-face {font-family: 'VeneerExtras';src: url('/sites/all/themes/bartik50/fonts/23CAF4_1_0.eot');src: url('/sites/all/themes/bartik50/fonts/23CAF4_1_0.eot?#iefix') format('embedded-opentype'),url('/sites/all/themes/bartik50/fonts/23CAF4_1_0.woff') format('woff'),url('/sites/all/themes/bartik50/fonts/23CAF4_1_0.ttf') format('truetype');}
+ 
